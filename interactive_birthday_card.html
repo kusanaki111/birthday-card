@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>การ์ดวันเกิด interactive</title>
+  <style>
+    :root{ --bg:#fff9f0; --card:#fff; --accent:#ff7bac; }
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans Thai',Arial; background:var(--bg); color:#333}
+    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:28px}
+    .panel{width:100%;max-width:420px;background:var(--card);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.08);padding:22px;text-align:center}
+
+    /* --- login --- */
+    #login p{margin:6px 0 12px;font-weight:600}
+    #code{font-size:20px;padding:10px;width:160px;text-align:center;border-radius:8px;border:1px solid #eee}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer}
+
+    /* --- stage --- */
+    #stage{margin-top:12px}
+    #mainImg{max-width:320px;width:90%;height:auto;border-radius:10px;cursor:pointer;transition:transform .18s ease,opacity .3s ease;user-select:none}
+    #mainImg:active{transform:scale(.99)}
+
+    /* envelope open animation (class added from JS) */
+    .envelope.opening{animation:envelopeOpen .8s forwards}
+    @keyframes envelopeOpen{
+      0% { transform: translateY(0) rotateX(0); }
+      40% { transform: translateY(-6px) rotateX(30deg); }
+      100% { transform: translateY(-22px) rotateX(70deg); opacity:0 }
+    }
+
+    /* message (letter) */
+    #message{display:none;padding:12px}
+    #message.show{display:block}
+    .letter{background:linear-gradient(#fff,#fff0);border-radius:12px;padding:18px;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .letter h2{margin:0 0 8px}
+    .letter p{margin:0;white-space:pre-wrap}
+
+    /* small helpers */
+    .hint{font-size:13px;color:#666;margin-top:10px}
+    .small{font-size:13px;color:#777}
+    .footer{margin-top:14px;font-size:13px;color:#666}
+
+    /* responsive */
+    @media (max-width:420px){.panel{padding:16px;border-radius:12px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <div id="login">
+        <p>สแกน QR แล้วใส่รหัส 6 หลัก (ตัวอย่าง)</p>
+        <input id="code" maxlength="6" placeholder="รหัส 6 หลัก" autofocus>
+        <div style="margin-top:12px"><button onclick="checkCode()">เข้าสู่การ์ด</button></div>
+      </div>
+
+      <div id="card" style="display:none">
+        <div id="stage">
+          <!-- รูปหลัก (เค้ก / ซอง / อนิเม) -->
+          <img id="mainImg" src="images/cake0.png" alt="เค้ก" tabindex="0" onclick="handleClick()">
+        </div>
+
+        <div id="message">
+          <div class="letter">
+            <h2 id="msgTitle">💗🌟สุขสันต์วันเกิดนะครับเบบี๋🌟💗</h2>
+            <p id="letterText" data-full="ขอให้วันเกิดปีนี้เป็นปีที่มีความสุขมากๆ นะค้าบเบบี๋ คิดสิ่งใดให้ได้สิ่งนั้น ไม่มีเรื่องร้ายๆ💖 ด้วยรักและห่วงใยจากคนที่รักดาวเหนือหมดหัวใจ ขอให้มีความสุขมากๆนะ เลิฟดาวเหนือนะครับจุ๊บๆ 💗🧜‍♀️🧚‍♀️"></p>
+          </div>
+        </div>
+
+        <div class="hint">กดที่รูปครั้งละ 1 ครั้งเพื่อเพิ่มเทียน — เมื่อครบจะเป็นซองจดหมาย → กดอีกครั้งเพื่อเปิด</div>
+        <div class="footer small">ถ้าต้องการเริ่มใหม่ ให้กดปุ่ม Reset</div>
+        <div style="margin-top:12px"><button onclick="resetCard()">Reset</button></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    /* ======================================================
+       *  โค้ดหลัก: เปลี่ยนค่าในส่วน "---- CHANGE HERE ----"
+       *  เปิดไฟล์นี้และค้นหา "CHANGE HERE" เพื่อแก้ไข
+       * ====================================================== */
+
+    /* ---- CHANGE HERE: ตั้งค่ารหัส 6 หลัก และรายการรูปเค้ก/ซอง ---- */
+    const correctCode = "220945"; // <- เปลี่ยนรหัสที่ต้องการ
+
+    // เตรียมรูปเค้กเป็นลำดับ (กด 1 ครั้ง = เปลี่ยนเป็นรูปถัดไป)
+    // ตัวอย่าง: images/cake0.png, images/cake1.png ... เปลี่ยนเป็นชื่อไฟล์ของคุณ
+    const cakeImages = [
+      "images/cake_0.png",
+      "images/cake_1.png",
+      "images/cake_2.png",
+      "images/cake_3.png",
+      "images/cake_4.png",
+      "images/cake_5.png",
+      "images/cake_6.png" // <--- เพิ่ม/ลด ตามที่เตรียม
+    ];
+
+    // รูปซองก่อนเปิด และ (ไม่จำเป็น) รูปซองที่เป็น "เปิดแล้ว"
+    const envelopeImage = "images/envelope.png"; // รูปซองปิด
+    const envelopeOpenImage = "images/envelope_open.png"; // (ถ้ามี) รูปซองที่เปิดแล้ว
+    /* ---- END CHANGE HERE ---- */
+
+    // (ไม่ต้องแก้าข้างล่างนี้) ตัวแปรสถานะ
+    let step = 0;           // เคลื่อนไหวผ่าน cakeImages
+    let phase = 'login';    // login | cake | envelope | opened
+
+    const loginDiv = document.getElementById('login');
+    const cardDiv = document.getElementById('card');
+    const mainImg = document.getElementById('mainImg');
+    const messageDiv = document.getElementById('message');
+    const letterText = document.getElementById('letterText');
+
+    function checkCode(){
+      const v = document.getElementById('code').value.trim();
+      if(v === correctCode){
+        loginDiv.style.display = 'none';
+        cardDiv.style.display = 'block';
+        phase = 'cake';
+        step = 0;
+        // แสดงรูปเค้กเริ่มต้น (ตรวจสอบว่ามีใน array)
+        mainImg.src = cakeImages[0] || envelopeImage;
+      } else {
+        alert('รหัสไม่ถูกต้อง ลองอีกครั้ง');
+      }
+    }
+
+    // รองรับกด Enter ที่ช่องรหัส
+    document.getElementById('code').addEventListener('keydown', function(e){ if(e.key === 'Enter') checkCode(); })
+
+    function handleClick(){
+      if(phase === 'cake') nextCake();
+      else if(phase === 'envelope') openEnvelope();
+      // ถ้า opened หรือ login ให้ไม่ทำอะไร
+    }
+
+    function nextCake(){
+      step++;
+      if(step < cakeImages.length){
+        mainImg.src = cakeImages[step];
+      } else {
+        // ถึงรูปสุดท้ายของเค้ก -> เปลี่ยนเป็นซอง
+        phase = 'envelope';
+        mainImg.src = envelopeImage;
+        mainImg.classList.remove('opened');
+      }
+    }
+
+    function openEnvelope(){
+      if(mainImg.classList.contains('opened')) return; // ป้องกันการกดซ้ำ
+      mainImg.classList.add('opening');
+
+      // ถ้ามีรูปซองเปิด ให้สลับเป็นรูปนั้นหลัง animation
+      if(envelopeOpenImage){
+        setTimeout(()=>{
+          mainImg.classList.remove('opening');
+          mainImg.classList.add('opened');
+          mainImg.src = envelopeOpenImage;
+          showMessage();
+        }, 700);
+      } else {
+        // ถ้าไม่มีรูปเปิด ให้ใช้ animation แล้วซ่อนรูปซอง
+        setTimeout(()=>{
+          mainImg.classList.remove('opening');
+          mainImg.style.opacity = 0;
+          mainImg.classList.add('opened');
+          showMessage();
+        }, 700);
+      }
+      phase = 'opened';
+    }
+
+    function showMessage(){
+      // แสดงข้อความพร้อม effect พิมพ์ (typewriter)
+      const full = letterText.dataset.full || letterText.textContent;
+      letterText.textContent = '';
+      messageDiv.classList.add('show');
+      typeWriter(letterText, full, 0);
+    }
+
+    function typeWriter(el, text, i){
+      if(i <= text.length){
+        el.textContent = text.slice(0,i);
+        setTimeout(()=> typeWriter(el, text, i+1), 30);
+      }
+    }
+
+    function resetCard(){
+      // รีเซ็ตกลับสู่การ์ดเริ่มต้น (ถ้าอยู่ในหน้าการ์ด)
+      phase = 'cake';
+      step = 0;
+      messageDiv.classList.remove('show');
+      mainImg.style.opacity = 1;
+      mainImg.classList.remove('opening','opened');
+      mainImg.src = cakeImages[0] || envelopeImage;
+      // กลับไปยังหน้าล็อกถ้าต้องการ (คอมเมนต์บรรทัดถัดไปถ้าไม่อยากกลับ)
+      // cardDiv.style.display='none'; loginDiv.style.display='block';
+    }
+
+    // ช่วยให้กด keyboard Enter เพื่อ next (ถ้าต้องการ)
+    document.addEventListener('keydown', function(e){
+      if(phase === 'cake' && (e.key === ' ' || e.key === 'Enter')){ e.preventDefault(); nextCake(); }
+      if(phase === 'envelope' && (e.key === ' ' || e.key === 'Enter')){ e.preventDefault(); openEnvelope(); }
+    });
+
+    // --- สิ้นสุดสคริปต์ ---
+  </script>
+
+  <!--
+    * คำแนะนำการเตรียมไฟล์ (ตัวอย่างโครงสร้างโฟลเดอร์):
+    /index.html (ไฟล์นี้)
+    /images/
+       cake0.png
+       cake1.png
+       ... (ตามที่กำหนดใน cakeImages)
+       envelope.png
+       envelope_open.png  (ถ้ามี)
+
+    * เปิดไฟล์นี้ด้วย Text Editor (VSCode, Notepad++)
+    * ค้นหาคำว่า "CHANGE HERE" เพื่อแก้รหัสและชื่อไฟล์รูป
+    * ทดสอบโดยเปิดไฟล์ index.html ในเบราว์เซอร์ (ดับเบิลคลิก) หรือ
+      รันเซิร์ฟเวอร์เล็ก ๆ ด้วย `python -m http.server` (ถ้าต้องการ)
+  -->
+</body>
+</html>
